@@ -1,39 +1,50 @@
-import { Context, Schema, h, Universal, Time, isNullable, Random, Session } from 'koishi'
-import { getMaxAge } from './utils'
-import { } from '@koishijs/cache'
+import {Context, Schema, h, Universal, Time, isNullable, Random, Session} from 'koishi';
+import {getMaxAge} from './utils';
+import {} from '@koishijs/cache';
+import {Jimp} from 'jimp';
 
 export const name = 'waifu'
 export const inject = {
   required: ['cache'],
-  optional: ['database']
+  optional: ['database'],
 }
 
 declare module '@koishijs/cache' {
   interface Tables {
-    [key: `waifu_members_${string}`]: Universal.GuildMember
+    [key: `waifu_members_${string}`]: Universal.GuildMember,
 
-    [key: `waifu_members_active_${string}`]: string
+    [key: `waifu_members_active_${string}`]: string,
 
-    [key: `waifu_marriages_${string}`]: string
+    [key: `waifu_marriages_${string}`]: string,
 
-    [key: `waifu_times_${string}`]: number
+    [key: `waifu_times_${string}`]: number,
+
+    [key: `waifu_image_${string}`]: marriageImage,
   }
 }
 
+export interface marriageImage {
+  color: string,
+  band: string,
+  starType: string,
+  starNum: number,
+  border: string,
+}
+
 export interface Config {
-  avoidNtr: boolean
-  onlyActiveUser: boolean
-  activeDays: number
+  avoidNtr: boolean,
+  onlyActiveUser: boolean,
+  activeDays: number,
   excludeUsers: {
-    uid: string
+    uid: string,
     note?: string
   }[]
-  maxTimes: number
-  forceMarry: boolean
-  propose: boolean
-  divorce: boolean
-  changeWaifu: boolean
-  waifuQuery: boolean
+  maxTimes: number,
+  forceMarry: boolean,
+  propose: boolean,
+  divorce: boolean,
+  changeWaifu: boolean,
+  waifuQuery: boolean,
 }
 
 export const Config: Schema<Config> = Schema.intersect([
@@ -44,8 +55,8 @@ export const Config: Schema<Config> = Schema.intersect([
     excludeUsers: Schema.array(Schema.object({
       uid: Schema.string().required(),
       note: Schema.string()
-    })).role('table').default([{ uid: 'red:2854196310', note: 'Q群管家' }]),
-    maxTimes: Schema.natural().default(2)
+    })).role('table').default([{uid: 'red:2854196310', note: 'Q群管家'}]),
+    maxTimes: Schema.natural().default(2),
   }).i18n({
     'zh-CN': require('./locales/zh-CN'),
   }),
@@ -54,37 +65,37 @@ export const Config: Schema<Config> = Schema.intersect([
     propose: Schema.boolean().description('是否启用求婚指令').default(false),
     divorce: Schema.boolean().description('是否启用离婚指令').default(false),
     changeWaifu: Schema.boolean().description('是否启用换老婆指令').experimental().default(false),
-    waifuQuery: Schema.boolean().description('是否启用查老婆指令').experimental().default(false)
+    waifuQuery: Schema.boolean().description('是否启用查老婆指令').experimental().default(false),
   }).description('附加指令')
 ])
 
 export function apply(ctx: Context, cfg: Config) {
-  ctx.i18n.define('zh-CN', require('./locales/zh-CN'))
+  ctx.i18n.define('zh-CN', require('./locales/zh-CN'));
 
   // gid: platform:guildId
   // fid: platform:guildId:userId
   // sid: platform:selfId
 
   ctx.guild().on('message-created', async (session) => {
-    if (isNullable(session.userId) || session.userId === '0') return
-    const member: Universal.GuildMember = { user: session.event.user, ...session.event.member }
-    await ctx.cache.set(`waifu_members_${session.gid}`, session.userId, member, 4 * Time.day)
-    await ctx.cache.set(`waifu_members_active_${session.gid}`, session.userId, '', cfg.activeDays * Time.day)
+    if (isNullable(session.userId) || session.userId === '0') return;
+    const member: Universal.GuildMember = {user: session.event.user, ...session.event.member};
+    await ctx.cache.set(`waifu_members_${session.gid}`, session.userId, member, 4 * Time.day);
+    await ctx.cache.set(`waifu_members_active_${session.gid}`, session.userId, '', cfg.activeDays * Time.day);
   })
 
   ctx.on('guild-member-removed', (session) => {
-    if (isNullable(session.userId) || session.userId === '0') return
-    ctx.cache.delete(`waifu_members_${session.gid}`, session.userId)
-    ctx.cache.delete(`waifu_members_active_${session.gid}`, session.userId)
+    if (isNullable(session.userId) || session.userId === '0') return;
+    ctx.cache.delete(`waifu_members_${session.gid}`, session.userId);
+    ctx.cache.delete(`waifu_members_active_${session.gid}`, session.userId);
   })
 
   async function getMemberList(session: Session, gid: string) {
     let result: Universal.GuildMember[] = []
     try {
-      const { data, next } = await session.bot.getGuildMemberList(session.guildId)
+      const {data, next} = await session.bot.getGuildMemberList(session.guildId)
       result = data
       if (next) {
-        const { data } = await session.bot.getGuildMemberList(session.guildId, next)
+        const {data} = await session.bot.getGuildMemberList(session.guildId, next)
         result.push(...data)
       }
     } catch {
@@ -97,49 +108,49 @@ export function apply(ctx: Context, cfg: Config) {
     return result
   }
 
-  async function getMemberInfo(member: Universal.GuildMember, id: string, platform: string) {
-    let name = member?.nick || member?.user?.nick || member?.user?.name
-    const avatar = member?.avatar || member?.user?.avatar
+  async function getMemberInfo(member: Universal.GuildMember, gid: string, userId: string, id: string, platform: string) {
+    let name = member?.nick || member?.user?.nick || member?.user?.name;
+    const avatar = member?.avatar || member?.user?.avatar;
     if (!name && ctx.database) {
       const user = await ctx.database.getUser(platform, id)
       if (user?.name) {
-        name = user.name
+        name = user.name;
       }
     }
-    name ||= id
-    return [name, avatar]
+    name ||= id;
+    return [name, await drawBanGDream(gid, userId, avatar)]
   }
 
   ctx.command('waifu')
     .alias('marry', '娶群友', '今日老婆')
-    .action(async ({ session }) => {
+    .action(async ({session}) => {
       if (!session.guildId) {
-        return session.text('.members-too-few')
+        return session.text('.members-too-few');
       }
-      const { gid } = session
-      const target = await ctx.cache.get(`waifu_marriages_${gid}`, session.userId)
+      const {gid} = session
+      const target = await ctx.cache.get(`waifu_marriages_${gid}`, session.userId);
       if (target) {
-        let selected: Universal.GuildMember
+        let selected: Universal.GuildMember;
         try {
           selected = await session.bot.getGuildMember(session.guildId, target)
         } catch {
         }
         try {
-          const member = await ctx.cache.get(`waifu_members_${gid}`, target)
+          const member = await ctx.cache.get(`waifu_members_${gid}`, target);
           if (!selected) {
             selected = member
           } else {
-            selected.nick ??= member.nick
-            selected.user ??= member.user
-            selected.user.name ??= member.user.name
+            selected.nick ??= member.nick;
+            selected.user ??= member.user;
+            selected.user.name ??= member.user.name;
           }
         } catch {
         }
         try {
-          selected ??= { user: await session.bot.getUser(target) }
+          selected ??= {user: await session.bot.getUser(target)};
         } catch {
         }
-        const [name, avatar] = await getMemberInfo(selected, target, session.platform)
+        const [name, avatar] = await getMemberInfo(selected, gid, session.userId, target, session.platform);
         return session.text('.marriages', {
           quote: h.quote(session.messageId),
           name,
@@ -147,62 +158,62 @@ export function apply(ctx: Context, cfg: Config) {
         })
       }
 
-      const excludes = cfg.excludeUsers.map(({ uid }) => uid)
-      excludes.push(session.uid, session.sid)
+      const excludes = cfg.excludeUsers.map(({uid}) => uid)
+      excludes.push(session.uid, session.sid);
 
-      const memberList = await getMemberList(session, gid)
+      const memberList = await getMemberList(session, gid);
       let list = memberList.filter(v => {
-        return v.user && !excludes.includes(`${session.platform}:${v.user.id}`) && !v.user.isBot
+        return v.user && !excludes.includes(`${session.platform}:${v.user.id}`) && !v.user.isBot;
       })
       if (cfg.onlyActiveUser) {
         let activeList: string[] = []
         for await (const value of ctx.cache.keys(`waifu_members_active_${gid}`)) {
-          activeList.push(value)
+          activeList.push(value);
         }
         list = list.filter(v => activeList.find(active => active === v.user.id))
       }
-      if (list.length === 0) return session.text('.members-too-few')
+      if (list.length === 0) return session.text('.members-too-few');
 
-      let selected = Random.pick(list)
-      let selectedId = selected.user.id
-      const selectedTarget = await ctx.cache.get(`waifu_marriages_${gid}`, selectedId)
+      let selected = Random.pick(list);
+      let selectedId = selected.user.id;
+      const selectedTarget = await ctx.cache.get(`waifu_marriages_${gid}`, selectedId);
       if (selectedTarget) {
-        selected = Random.pick(list)
-        selectedId = selected.user.id
+        selected = Random.pick(list);
+        selectedId = selected.user.id;
       }
       if (cfg.avoidNtr) {
-        let i = 0
+        let i = 0;
         while (true) {
-          const selectedTarget = await ctx.cache.get(`waifu_marriages_${gid}`, selectedId)
+          const selectedTarget = await ctx.cache.get(`waifu_marriages_${gid}`, selectedId);
           if (selectedTarget) {
-            selected = Random.pick(list)
-            selectedId = selected.user.id
+            selected = Random.pick(list);
+            selectedId = selected.user.id;
           } else {
-            break
+            break;
           }
-          i++
-          if (i > list.length) return session.text('.members-too-few')
+          i++;
+          if (i > list.length) return session.text('.members-too-few');
         }
       }
-      const maxAge = getMaxAge()
-      await ctx.cache.set(`waifu_marriages_${gid}`, session.userId, selectedId, maxAge)
-      await ctx.cache.set(`waifu_marriages_${gid}`, selectedId, session.userId, maxAge)
+      const maxAge = getMaxAge();
+      await ctx.cache.set(`waifu_marriages_${gid}`, session.userId, selectedId, maxAge);
+      await ctx.cache.set(`waifu_marriages_${gid}`, selectedId, session.userId, maxAge);
 
       //记录已经结婚，设置times为1，确保用户下次调用换老婆时能够获得正确的次数
-      await ctx.cache.set(`waifu_times_${gid}`, session.userId, 1, maxAge)
+      await ctx.cache.set(`waifu_times_${gid}`, session.userId, 1, maxAge);
 
-      const [name, avatar] = await getMemberInfo(selected, selectedId, session.platform)
+      const [name, avatar] = await getMemberInfo(selected, gid, session.userId, selectedId, session.platform);
       return session.text('.marriages', {
         quote: h.quote(session.messageId),
         name,
         avatar: avatar && h.image(avatar)
-      })
+      });
     })
 
   if (cfg.forceMarry) {
     ctx.command('force-marry <target:user>')
       .alias('强娶')
-      .action(async ({ session }, target) => {
+      .action(async ({session}, target) => {
         if (!session.guildId) {
           return session.text('.members-too-few')
         }
@@ -214,7 +225,7 @@ export function apply(ctx: Context, cfg: Config) {
 
         const targetId = target.slice(session.platform.length + 1)
         if (targetId === session.userId) return session.text('.target-self')
-        const { gid } = session
+        const {gid} = session
 
         const marriage = await ctx.cache.get(`waifu_marriages_${gid}`, session.userId)
         if (marriage) {
@@ -232,7 +243,7 @@ export function apply(ctx: Context, cfg: Config) {
         await ctx.cache.set(`waifu_marriages_${gid}`, session.userId, selectedId, maxAge)
         await ctx.cache.set(`waifu_marriages_${gid}`, selectedId, session.userId, maxAge)
 
-        const [name, avatar] = await getMemberInfo(selected, selectedId, session.platform)
+        const [name, avatar] = await getMemberInfo(selected, gid, session.userId, selectedId, session.platform)
         return session.text('.force-marry', {
           quote: h.quote(session.messageId),
           name,
@@ -244,7 +255,7 @@ export function apply(ctx: Context, cfg: Config) {
   if (cfg.propose) {
     ctx.command('propose <target:user>')
       .alias('求婚')
-      .action(async ({ session }, target) => {
+      .action(async ({session}, target) => {
         if (!session.guildId) {
           return session.text('.members-too-few')
         }
@@ -256,7 +267,7 @@ export function apply(ctx: Context, cfg: Config) {
 
         const targetId = target.slice(session.platform.length + 1)
         if (targetId === session.userId) return session.text('.target-self')
-        const { gid } = session
+        const {gid} = session
 
         const marriage = await ctx.cache.get(`waifu_marriages_${gid}`, session.userId)
         if (marriage) {
@@ -270,7 +281,7 @@ export function apply(ctx: Context, cfg: Config) {
         if (!selected) return session.text('.members-too-few')
 
         const selectedId = selected.user.id
-        const [name, avatar] = await getMemberInfo(selected, selectedId, session.platform)
+        const [name, avatar] = await getMemberInfo(selected, gid, session.userId, selectedId, session.platform)
 
 
         await session.send(
@@ -291,7 +302,7 @@ export function apply(ctx: Context, cfg: Config) {
         const dispose = ctx.platform(session.platform)
           .user(selected.user.id)
           .guild(session.guildId)
-          .on('message-created', async ({ elements, text, send }) => {
+          .on('message-created', async ({elements, text, send}) => {
             const reply = h.select(elements, 'text').join('').trim()
             if (reply === '我愿意') {
               dispose()
@@ -335,8 +346,8 @@ export function apply(ctx: Context, cfg: Config) {
   if (cfg.divorce) {
     ctx.command('divorce')
       .alias('离婚')
-      .action(async ({ session }) => {
-        const { gid } = session
+      .action(async ({session}) => {
+        const {gid} = session
 
         const marriage = await ctx.cache.get(`waifu_marriages_${gid}`, session.userId)
         if (!marriage) {
@@ -356,11 +367,11 @@ export function apply(ctx: Context, cfg: Config) {
   if (cfg.changeWaifu) {
     ctx.command('change-waifu')
       .alias('换老婆')
-      .action(async ({ session }) => {
+      .action(async ({session}) => {
         if (!session.guildId) {
           return session.text('.members-too-few')
         }
-        const { gid } = session
+        const {gid} = session
         const marriage = await ctx.cache.get(`waifu_marriages_${gid}`, session.userId)
 
         const times = await ctx.cache.get(`waifu_times_${gid}`, session.userId)
@@ -377,7 +388,7 @@ export function apply(ctx: Context, cfg: Config) {
             quote: h.quote(session.messageId)
           })
         }
-        const excludes = cfg.excludeUsers.map(({ uid }) => uid)
+        const excludes = cfg.excludeUsers.map(({uid}) => uid)
         excludes.push(session.uid, session.sid)
         const memberList = await getMemberList(session, gid)
         let list = memberList.filter((v) => {
@@ -437,12 +448,11 @@ export function apply(ctx: Context, cfg: Config) {
         await ctx.cache.set(`waifu_marriages_${gid}`, selectedId, session.userId, maxAge)
 
 
-
         //请求次数+1
         await ctx.cache.set(`waifu_times_${gid}`, session.userId, times + 1, maxAge)
 
 
-        const [name2, avatar] = await getMemberInfo(selected, selectedId, session.platform)
+        const [name2, avatar] = await getMemberInfo(selected, gid, session.userId, selectedId, session.platform)
         if (times == cfg.maxTimes && cfg.maxTimes != 0) {
           return session.text('.last-times', {
             quote: h.quote(session.messageId),
@@ -466,11 +476,11 @@ export function apply(ctx: Context, cfg: Config) {
   if (cfg.waifuQuery) {
     ctx.command('waifu-query')
       .alias('查老婆')
-      .action(async ({ session }) => {
+      .action(async ({session}) => {
         if (!session.guildId) {
           return session.text('.not-married')
         }
-        const { gid } = session
+        const {gid} = session
         const target = await ctx.cache.get(`waifu_marriages_${gid}`, session.userId)
         if (target) {
           let selected: Universal.GuildMember
@@ -490,10 +500,10 @@ export function apply(ctx: Context, cfg: Config) {
           } catch {
           }
           try {
-            selected ??= { user: await session.bot.getUser(target) }
+            selected ??= {user: await session.bot.getUser(target)}
           } catch {
           }
-          const [name, avatar] = await getMemberInfo(selected, target, session.platform)
+          const [name, avatar] = await getMemberInfo(selected, gid, session.userId, target, session.platform)
           return session.text('.marriages', {
             quote: h.quote(session.messageId),
             name,
@@ -504,4 +514,72 @@ export function apply(ctx: Context, cfg: Config) {
         }
       })
   }
+
+  async function drawBanGDream(gid: string, userId: string, avatar: string, options?: {
+    color: string,
+    band: string,
+    starType: string,
+    starNum: number,
+    border: string,
+  }) {
+
+    if (!avatar) {
+      return ''
+    }
+    if (!options) {
+      const cacheImageOption = await ctx.cache.get(`waifu_image_${gid}`, userId);
+      if (!cacheImageOption) {
+        const colors = ['cool', 'pure', 'happy', 'powerful'];
+        const bands = ['ppp', 'ag', 'pp', 'r', 'hhw', 'ras', 'mnk', 'go'];
+        const starTypes = ['normal_star', 'color_star'];
+        //const borders = ['card-1', 'card-2', 'card-3', 'card-4', 'card-5'];
+        options = {
+          color: Random.pick(colors),
+          band: Random.pick(bands),
+          starNum: Random.pick([1, 2, 3, 4, 5]),
+          starType: '',
+          border: '',
+        }
+        options.starType = options.starNum < 3 ? starTypes[0] : Random.pick(starTypes);
+        options.border = `card-${options.starNum}${options.starNum == 1 ? `-${options.color}` : ''}`;
+        await ctx.cache.set(`waifu_image_${gid}`, userId, options, getMaxAge());
+      } else {
+        options = cacheImageOption;
+      }
+
+    }
+    const assetUrl = `${__dirname}/../assets`
+
+
+    //console.log(border);
+
+    const [image, colorImage, bandImage, starImage, borderImage] = await Promise.all([
+      Jimp.read(avatar),
+      Jimp.read(`${assetUrl}/${options.color}.png`),
+      Jimp.read(`${assetUrl}/${options.band}.png`),
+      Jimp.read(`${assetUrl}/${options.starType}.png`),
+      Jimp.read(`${assetUrl}/${options.border}.png`),
+    ]);
+
+    const zoom = 2.0;
+
+    image.cover({w: 500 * zoom, h: 500 * zoom});
+    borderImage.cover({w: 500 * zoom, h: 500 * zoom});
+    image.composite(borderImage);
+    colorImage.cover({w: 130 * zoom, h: 130 * zoom});
+    image.composite(colorImage, image.width - colorImage.width - 3 * zoom, 5.5);
+    bandImage.width > bandImage.height ? bandImage.resize({w: 120 * zoom}) : bandImage.resize({h: 120 * zoom});
+    image.composite(bandImage, 15 * zoom, 15 * zoom);
+    starImage.resize({w: 80 * zoom});
+    const step = 58 * zoom;
+    let hei = 410 * zoom;
+    let times = options.starNum;
+    while (times > 0) {
+      image.composite(starImage, 10 * zoom, hei);
+      hei -= step;
+      times--;
+    }
+    return `data:image/png;base64,${(await image.getBuffer("image/jpeg")).toString("base64")}`;
+  }
 }
+

@@ -6,7 +6,8 @@
   "typings": "lib/index.d.ts",
   "files": [
     "lib",
-    "dist"
+    "dist",
+    "assets"
   ],
   "license": "MIT",
   "keywords": [
@@ -35,5 +36,9 @@
     },
     "browser": true
   },
-  "packageManager": "yarn@4.5.3"
+  "packageManager": "yarn@4.5.3",
+  "dependencies": {
+    "canvas": "^3.1.0",
+    "jimp": "^1.6.0"
+  }
 }
