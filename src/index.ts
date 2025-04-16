@@ -581,8 +581,8 @@ export function apply(ctx: Context, cfg: Config) {
     image.composite(colorImage, image.width - colorImage.width - 3 * zoom, 5.5);
     bandImage.width > bandImage.height ? bandImage.resize({w: 120 * zoom}) : bandImage.resize({h: 120 * zoom});
     image.composite(bandImage, 15 * zoom, 15 * zoom);
-    starImage.resize({w: 80 * zoom});
-    const step = 58 * zoom;
+    starImage.resize({w: 90 * zoom});
+    const step = 60 * zoom;
     let hei = 410 * zoom;
     let times = options.starNum;
     while (times > 0) {
