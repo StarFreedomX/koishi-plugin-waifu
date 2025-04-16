@@ -355,8 +355,12 @@ export function apply(ctx: Context, cfg: Config) {
             quote: h.quote(session.messageId)
           })
         } else {
-          ctx.cache.delete(`waifu_marriages_${gid}`, marriage)
-          ctx.cache.delete(`waifu_marriages_${gid}`, session.userId)
+          await Promise.all([
+            ctx.cache.delete(`waifu_marriages_${gid}`, marriage),
+            ctx.cache.delete(`waifu_marriages_${gid}`, session.userId),
+            ctx.cache.delete(`waifu_image_${gid}`, marriage),
+            ctx.cache.delete(`waifu_image_${gid}`, session.userId),
+          ])
           return session.text('.divorcement', {
             quote: h.quote(session.messageId)
           })
@@ -377,8 +381,12 @@ export function apply(ctx: Context, cfg: Config) {
         const times = await ctx.cache.get(`waifu_times_${gid}`, session.userId)
         if (times > cfg.maxTimes && cfg.maxTimes != 0) {
           if (marriage) {
-            ctx.cache.delete(`waifu_marriages_${gid}`, marriage)
-            ctx.cache.delete(`waifu_marriages_${gid}`, session.userId)
+            await Promise.all([
+              ctx.cache.delete(`waifu_marriages_${gid}`, marriage),
+              ctx.cache.delete(`waifu_marriages_${gid}`, session.userId),
+              ctx.cache.delete(`waifu_image_${gid}`, session.userId),
+              ctx.cache.delete(`waifu_image_${gid}`, marriage),
+            ])
           }
           return session.text('.times-too-many', {
             quote: h.quote(session.messageId)
@@ -438,19 +446,22 @@ export function apply(ctx: Context, cfg: Config) {
         //如果程序运行到这里，那么说明已经获取了一个新的人，那么就继续
 
         //解绑当前关系
-        ctx.cache.delete(`waifu_marriages_${gid}`, marriage)
-        ctx.cache.delete(`waifu_marriages_${gid}`, session.userId)
+        await Promise.all([
+          ctx.cache.delete(`waifu_marriages_${gid}`, marriage),
+          ctx.cache.delete(`waifu_marriages_${gid}`, session.userId),
+          ctx.cache.delete(`waifu_image_${gid}`, session.userId),
+          ctx.cache.delete(`waifu_image_${gid}`, marriage),
+        ])
 
         //绑定新的关系
         const maxAge = getMaxAge()
 
-        await ctx.cache.set(`waifu_marriages_${gid}`, session.userId, selectedId, maxAge)
-        await ctx.cache.set(`waifu_marriages_${gid}`, selectedId, session.userId, maxAge)
-
-
-        //请求次数+1
-        await ctx.cache.set(`waifu_times_${gid}`, session.userId, times + 1, maxAge)
-
+        await Promise.all([
+          ctx.cache.set(`waifu_marriages_${gid}`, session.userId, selectedId, maxAge),
+          ctx.cache.set(`waifu_marriages_${gid}`, selectedId, session.userId, maxAge),
+          //请求次数+1
+          ctx.cache.set(`waifu_times_${gid}`, session.userId, times + 1, maxAge),
+        ])
 
         const [name2, avatar] = await getMemberInfo(selected, gid, session.userId, selectedId, session.platform)
         if (times == cfg.maxTimes && cfg.maxTimes != 0) {
