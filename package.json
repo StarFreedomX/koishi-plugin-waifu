@@ -1,7 +1,7 @@
 {
-  "name": "koishi-plugin-waifu",
-  "description": "Marry with your groupmate",
-  "version": "1.10.0",
+  "name": "koishi-plugin-waifu-bangdream",
+  "description": "Marry with your groupmate, with BanG Dream Border!",
+  "version": "1.1.0",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
@@ -16,11 +16,12 @@
     "plugin",
     "waifu",
     "marry",
-    "wife"
+    "wife",
+    "bangdream"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/idranme/koishi-plugin-waifu.git"
+    "url": "https://github.com/StarFreedomX/koishi-plugin-waifu-BanGDream.git"
   },
   "peerDependencies": {
     "koishi": "^4.17.7"
@@ -32,7 +33,7 @@
   "koishi": {
     "description": {
       "en": "Marry with your groupmate",
-      "zh": "娶群友！来寻找你今日的群友老婆吧！"
+      "zh": "改自koishi-plugin-waifu，添加了BanG Dream边框"
     },
     "browser": true
   },

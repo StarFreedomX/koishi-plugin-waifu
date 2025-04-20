@@ -2,12 +2,19 @@ import {Context, Schema, h, Universal, Time, isNullable, Random, Session} from '
 import {getMaxAge} from './utils';
 import {} from '@koishijs/cache';
 import {Jimp} from 'jimp';
+import * as fs from "node:fs";
 
-export const name = 'waifu'
+export const name = 'waifu-bangdream'
 export const inject = {
   required: ['cache'],
   optional: ['database'],
 }
+
+export const usage = `
+<h2>娶群友</h2>
+本插件fork自<a href="/market?keyword=koishi-plugin-waifu">koishi-plugin-waifu</a><br/>
+在原仓库的基础上添加了BanG Dream!的随机边框！<br/>
+`
 
 declare module '@koishijs/cache' {
   interface Tables {
@@ -30,6 +37,9 @@ export interface marriageImage {
   starNum: number,
   border: string,
 }
+
+
+let assetUrl;
 
 export interface Config {
   avoidNtr: boolean,
@@ -71,6 +81,8 @@ export const Config: Schema<Config> = Schema.intersect([
 
 export function apply(ctx: Context, cfg: Config) {
   ctx.i18n.define('zh-CN', require('./locales/zh-CN'));
+
+  initAssets();
 
   // gid: platform:guildId
   // fid: platform:guildId:userId
@@ -119,6 +131,22 @@ export function apply(ctx: Context, cfg: Config) {
     }
     name ||= id;
     return [name, await drawBanGDream(gid, userId, avatar)]
+  }
+
+  function initAssets(){
+    const fromUrl = `${__dirname}/../assets`;
+    assetUrl = `${ctx.baseDir}/data/waifu/assets`;
+    if (!fs.existsSync(fromUrl)) return;
+    if (!fs.readdirSync(fromUrl)?.length) return;
+    if (!fs.existsSync(assetUrl)) {
+      fs.mkdirSync(assetUrl, { recursive: true });
+    }
+
+    fs.cpSync(fromUrl, assetUrl, { recursive: true, force: true });
+    if (process.env.NODE_ENV !== "development"){
+      fs.rmSync(fromUrl, { recursive: true });
+    }
+
   }
 
   ctx.command('waifu')
@@ -559,7 +587,7 @@ export function apply(ctx: Context, cfg: Config) {
       }
 
     }
-    const assetUrl = `${__dirname}/../assets`
+
 
 
     //console.log(border);
