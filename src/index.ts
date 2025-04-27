@@ -130,7 +130,7 @@ export function apply(ctx: Context, cfg: Config) {
       }
     }
     name ||= id;
-    return [name, await drawBanGDream(gid, userId, avatar)]
+    return [name, await drawBanGDream(gid, id, avatar)]
   }
 
   function initAssets(){
@@ -386,8 +386,6 @@ export function apply(ctx: Context, cfg: Config) {
           await Promise.all([
             ctx.cache.delete(`waifu_marriages_${gid}`, marriage),
             ctx.cache.delete(`waifu_marriages_${gid}`, session.userId),
-            ctx.cache.delete(`waifu_image_${gid}`, marriage),
-            ctx.cache.delete(`waifu_image_${gid}`, session.userId),
           ])
           return session.text('.divorcement', {
             quote: h.quote(session.messageId)
@@ -412,8 +410,6 @@ export function apply(ctx: Context, cfg: Config) {
             await Promise.all([
               ctx.cache.delete(`waifu_marriages_${gid}`, marriage),
               ctx.cache.delete(`waifu_marriages_${gid}`, session.userId),
-              ctx.cache.delete(`waifu_image_${gid}`, session.userId),
-              ctx.cache.delete(`waifu_image_${gid}`, marriage),
             ])
           }
           return session.text('.times-too-many', {
@@ -477,8 +473,6 @@ export function apply(ctx: Context, cfg: Config) {
         await Promise.all([
           ctx.cache.delete(`waifu_marriages_${gid}`, marriage),
           ctx.cache.delete(`waifu_marriages_${gid}`, session.userId),
-          ctx.cache.delete(`waifu_image_${gid}`, session.userId),
-          ctx.cache.delete(`waifu_image_${gid}`, marriage),
         ])
 
         //绑定新的关系
