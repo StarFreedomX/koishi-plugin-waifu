@@ -187,7 +187,8 @@ export function apply(ctx: Context, cfg: Config) {
       }
 
       const waifuTimes = await ctx.cache.get(`waifu_times_${gid}`, session.userId);
-      if (waifuTimes >= cfg.activeDays  && cfg.maxTimes != 0) return session.text('.times-too-many');
+      console.log(waifuTimes);
+      if (waifuTimes > cfg.maxTimes && cfg.maxTimes != 0) return session.text('.times-too-many');
 
       const excludes = cfg.excludeUsers.map(({uid}) => uid)
       excludes.push(session.uid, session.sid);
@@ -231,7 +232,7 @@ export function apply(ctx: Context, cfg: Config) {
       await ctx.cache.set(`waifu_marriages_${gid}`, selectedId, session.userId, maxAge);
 
       //记录已经结婚，设置times为1，确保用户下次调用换老婆时能够获得正确的次数
-      await ctx.cache.set(`waifu_times_${gid}`, session.userId, waifuTimes + 1 || 1, maxAge);
+      await ctx.cache.set(`waifu_times_${gid}`, session.userId, waifuTimes ? waifuTimes + 1 : 1, maxAge);
 
       const [name, avatar] = await getMemberInfo(selected, gid, session.userId, selectedId, session.platform);
       return session.text('.marriages', {
@@ -487,7 +488,7 @@ export function apply(ctx: Context, cfg: Config) {
           //请求次数+1
           ctx.cache.set(`waifu_times_${gid}`, session.userId, times + 1, maxAge),
         ])
-
+        console.log(times)
         const [name2, avatar] = await getMemberInfo(selected, gid, session.userId, selectedId, session.platform)
         if (times == cfg.maxTimes && cfg.maxTimes != 0) {
           return session.text('.last-times', {
