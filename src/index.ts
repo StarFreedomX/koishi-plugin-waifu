@@ -187,8 +187,8 @@ export function apply(ctx: Context, cfg: Config) {
       }
 
       const waifuTimes = await ctx.cache.get(`waifu_times_${gid}`, session.userId);
-      console.log(waifuTimes);
-      if (waifuTimes > cfg.maxTimes && cfg.maxTimes != 0) return session.text('.times-too-many');
+      //console.log(waifuTimes);
+      if (waifuTimes && waifuTimes > cfg.maxTimes && cfg.maxTimes != 0) return session.text('.times-too-many');
 
       const excludes = cfg.excludeUsers.map(({uid}) => uid)
       excludes.push(session.uid, session.sid);
@@ -272,8 +272,12 @@ export function apply(ctx: Context, cfg: Config) {
 
         const selectedId = selected.user.id
         const maxAge = getMaxAge()
-        await ctx.cache.set(`waifu_marriages_${gid}`, session.userId, selectedId, maxAge)
-        await ctx.cache.set(`waifu_marriages_${gid}`, selectedId, session.userId, maxAge)
+        const times = await ctx.cache.get(`waifu_times_${gid}`, session.userId) || 0
+        await Promise.all([
+          ctx.cache.set(`waifu_marriages_${gid}`, session.userId, selectedId, maxAge),
+          ctx.cache.set(`waifu_marriages_${gid}`, selectedId, session.userId, maxAge),
+          ctx.cache.set(`waifu_times_${gid}`, session.userId, times + 1, maxAge)
+        ]);
 
         const [name, avatar] = await getMemberInfo(selected, gid, session.userId, selectedId, session.platform)
         return session.text('.force-marry', {
@@ -408,7 +412,7 @@ export function apply(ctx: Context, cfg: Config) {
         const {gid} = session
         const marriage = await ctx.cache.get(`waifu_marriages_${gid}`, session.userId)
 
-        const times = await ctx.cache.get(`waifu_times_${gid}`, session.userId)
+        const times = await ctx.cache.get(`waifu_times_${gid}`, session.userId) || 0
         if (times > cfg.maxTimes && cfg.maxTimes != 0) {
           if (marriage) {
             await Promise.all([
@@ -419,7 +423,7 @@ export function apply(ctx: Context, cfg: Config) {
           return session.text('.times-too-many', {
             quote: h.quote(session.messageId)
           })
-        } else if (!marriage || times == 0 || typeof times == 'undefined') {
+        } else if (!marriage) {
           return session.text('.not-married', {
             quote: h.quote(session.messageId)
           })
